@@ -8,11 +8,8 @@ local filesystem.
 Installing
 ----------
 
-The S3 blobstore introduces one new dependency: the servicemix OSGI
-AWS SDK bundle.  To install, Copy nexus-blobstore-s3-*.jar and the AWS
-SDK bundle jar into the nexus/deploy subdirectory.
-
-```mvn dependency:get -Dartifact=org.apache.servicemix.bundles:org.apache.servicemix.bundles.aws-java-sdk:1.11.92_1 -Ddest=.```
+To install, Copy nexus-blobstore-s3-*.jar and the AWS SDK bundle jar
+into the nexus/deploy subdirectory.
 
 Start the bundle from the Nexus console:
 
