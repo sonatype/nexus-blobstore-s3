@@ -13,7 +13,6 @@
 package org.sonatype.nexus.blobstore.s3.internal;
 
 import javax.inject.Named;
-import javax.inject.Provider;
 
 import org.sonatype.nexus.blobstore.api.BlobStoreConfiguration;
 

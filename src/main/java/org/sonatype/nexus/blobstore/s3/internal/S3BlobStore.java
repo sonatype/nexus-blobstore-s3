@@ -22,7 +22,6 @@ import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.inject.Provider;
 
 import org.sonatype.nexus.blobstore.BlobSupport;
 import org.sonatype.nexus.blobstore.LocationStrategy;
