@@ -79,6 +79,10 @@ public class S3BlobStore
 
   public static final String SECRET_ACCESS_KEY_KEY = "secretAccessKey";
 
+  public static final String SESSION_TOKEN_KEY = "sessionToken";
+
+  public static final String ASSUME_ROLE_KEY = "assumeRole";
+
   public static final String REGION_KEY = "region";
 
   public static final String METADATA_FILENAME = "metadata.properties";

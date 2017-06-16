@@ -17,16 +17,21 @@ import javax.inject.Named;
 import org.sonatype.nexus.blobstore.api.BlobStoreConfiguration;
 
 import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.auth.BasicSessionCredentials;
+import com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.google.common.base.Strings;
 
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.ACCESS_KEY_ID_KEY;
+import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.ASSUME_ROLE_KEY;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.CONFIG_KEY;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.REGION_KEY;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.SECRET_ACCESS_KEY_KEY;
+import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.SESSION_TOKEN_KEY;
 
 /**
  * Creates configured AmazonS3 clients.
@@ -41,8 +46,26 @@ public class AmazonS3Factory
     String accessKeyId = blobStoreConfiguration.attributes(CONFIG_KEY).get(ACCESS_KEY_ID_KEY, String.class);
     String secretAccessKey = blobStoreConfiguration.attributes(CONFIG_KEY).get(SECRET_ACCESS_KEY_KEY, String.class);
     if (!Strings.isNullOrEmpty(accessKeyId) && !Strings.isNullOrEmpty(secretAccessKey)) {
-      AWSCredentials credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
-      builder = builder.withCredentials(new AWSStaticCredentialsProvider(credentials));
+
+      AWSCredentials credentials;
+      String sessionToken = blobStoreConfiguration.attributes(CONFIG_KEY).get(SESSION_TOKEN_KEY, String.class);
+      if (!Strings.isNullOrEmpty(sessionToken)) {
+        credentials = new BasicSessionCredentials(accessKeyId, secretAccessKey, sessionToken);
+      }
+      else {
+        credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
+      }
+
+      AWSCredentialsProvider credentialsProvider;
+      String assumeRole = blobStoreConfiguration.attributes(CONFIG_KEY).get(ASSUME_ROLE_KEY, String.class);
+      if (!Strings.isNullOrEmpty(assumeRole)) {
+        credentialsProvider = new STSAssumeRoleSessionCredentialsProvider.Builder(assumeRole, "nexus-s3-session")
+          .withLongLivedCredentials(credentials).build();
+      }
+      else {
+        credentialsProvider = new AWSStaticCredentialsProvider(credentials);
+      }
+      builder = builder.withCredentials(credentialsProvider);
     }
 
     String region = blobStoreConfiguration.attributes(CONFIG_KEY).get(REGION_KEY, String.class);
