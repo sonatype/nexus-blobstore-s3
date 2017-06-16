@@ -59,6 +59,18 @@ public class S3BlobStoreDescriptor
     @DefaultMessage("AWS Secret Access Key")
     String secretAccessKeyHelp();
 
+    @DefaultMessage("Session Token")
+    String sessionTokenLabel();
+
+    @DefaultMessage("STS Session Token")
+    String sessionTokenHelp();
+
+    @DefaultMessage("Assume Role ARN")
+    String assumeRoleLabel();
+
+    @DefaultMessage("Assume Role ARN")
+    String assumeRoleHelp();
+
     @DefaultMessage("Region")
     String regionLabel();
 
@@ -71,6 +83,8 @@ public class S3BlobStoreDescriptor
   private final FormField bucket;
   private final FormField accessKeyId;
   private final FormField secretAccessKey;
+  private final FormField sessionToken;
+  private final FormField assumeRole;
   private final FormField region;
 
   public S3BlobStoreDescriptor() {
@@ -92,6 +106,18 @@ public class S3BlobStoreDescriptor
         messages.secretAccessKeyHelp(),
         FormField.OPTIONAL
     );
+    this.assumeRole = new StringTextFormField(
+        S3BlobStore.ASSUME_ROLE_KEY,
+        messages.assumeRoleLabel(),
+        messages.assumeRoleHelp(),
+        FormField.OPTIONAL
+    );
+    this.sessionToken = new StringTextFormField(
+        S3BlobStore.SESSION_TOKEN_KEY,
+        messages.sessionTokenLabel(),
+        messages.sessionTokenHelp(),
+        FormField.OPTIONAL
+    );
     this.region = new StringTextFormField(
         S3BlobStore.REGION_KEY,
         messages.regionLabel(),
@@ -107,6 +133,6 @@ public class S3BlobStoreDescriptor
 
   @Override
   public List<FormField> getFormFields() {
-    return Arrays.asList(bucket, accessKeyId, secretAccessKey, region);
+      return Arrays.asList(bucket, accessKeyId, secretAccessKey, sessionToken, assumeRole, region);
   }
 }
