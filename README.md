@@ -16,8 +16,12 @@ we would like things to flow.
 Installing
 ----------
 
-To install, Copy nexus-blobstore-s3-*.jar and the AWS SDK bundle jar
-into the nexus/deploy subdirectory.
+See `install.sh`.  This copies the nexus-blobstore-s3 jar file to the
+right place and updates the configuration files.  Use at your own
+risk.
+
+Alternatively, copy nexus-blobstore-s3-*.jar and the AWS SDK bundle
+jar into the nexus/deploy subdirectory.
 
 Start the bundle from the Nexus Repository console:
 
@@ -33,12 +37,15 @@ Log in as admin and create a new blobstore, selecting S3 as the type.
 Enter the bucket name as the path.  You need valid AWS credentials in
 `~/.aws/credentials`.
 
-Now you can create repositories with your new S3 blobstore.
+Now you can create repositories with your new S3 blobstore.  The UI
+isn't quite done -- for now, enter the bucket name as the path.
 
 Todo
 ----
 
-Still to do: proper configuration screen that allows AWS credentials to be entered (requires upstream changes).
+Still to do: proper configuration screen that allows AWS credentials
+to be entered (requires upstream changes).  See the config-ui branch
+in git.
 
 The Fine Print
 --------------
