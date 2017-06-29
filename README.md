@@ -34,18 +34,8 @@ Configuration
 -------------
 
 Log in as admin and create a new blobstore, selecting S3 as the type.
-Enter the bucket name as the path.  You need valid AWS credentials in
-`~/.aws/credentials`.
-
-Now you can create repositories with your new S3 blobstore.  The UI
-isn't quite done -- for now, enter the bucket name as the path.
-
-Todo
-----
-
-Still to do: proper configuration screen that allows AWS credentials
-to be entered (requires upstream changes).  See the config-ui branch
-in git.
+If any fields are left blank, AWS credentials in `~/.aws/credentials`
+will be used.
 
 The Fine Print
 --------------
