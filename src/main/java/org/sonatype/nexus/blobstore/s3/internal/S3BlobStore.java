@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.concurrent.locks.Lock;
 
 import javax.annotation.Nullable;
@@ -28,6 +29,7 @@ import org.sonatype.nexus.blobstore.LocationStrategy;
 import org.sonatype.nexus.blobstore.MetricsInputStream;
 import org.sonatype.nexus.blobstore.StreamMetrics;
 import org.sonatype.nexus.blobstore.api.Blob;
+import org.sonatype.nexus.blobstore.api.BlobAttributes;
 import org.sonatype.nexus.blobstore.api.BlobId;
 import org.sonatype.nexus.blobstore.api.BlobMetrics;
 import org.sonatype.nexus.blobstore.api.BlobStore;
@@ -451,5 +453,22 @@ public class S3BlobStore
 
   private interface BlobIngester {
     StreamMetrics ingestTo(final String destination) throws IOException;
+  }
+
+  @Override
+  public Stream<BlobId> getBlobIdStream() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BlobAttributes getBlobAttributes(final BlobId blobId) {
+    try {
+      S3BlobAttributes blobAttributes = new S3BlobAttributes(s3, getConfiguredBucket(), attributePath(blobId));
+      return blobAttributes.load() ? blobAttributes : null;
+    }
+    catch (IOException e) {
+      log.error("Unable to load S3BlobAttributes for blob id: {}", blobId, e);
+      return null;
+    }
   }
 }

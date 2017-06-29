@@ -18,33 +18,32 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 
+import org.sonatype.nexus.blobstore.api.BlobAttributes;
 import org.sonatype.nexus.blobstore.api.BlobMetrics;
 
 import com.amazonaws.services.s3.AmazonS3;
 import org.joda.time.DateTime;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.sonatype.nexus.blobstore.api.BlobAttributesConstants.CONTENT_SIZE_ATTRIBUTE;
+import static org.sonatype.nexus.blobstore.api.BlobAttributesConstants.CREATION_TIME_ATTRIBUTE;
+import static org.sonatype.nexus.blobstore.api.BlobAttributesConstants.DELETED_ATTRIBUTE;
+import static org.sonatype.nexus.blobstore.api.BlobAttributesConstants.DELETED_REASON_ATTRIBUTE;
+import static org.sonatype.nexus.blobstore.api.BlobAttributesConstants.HEADER_PREFIX;
+import static org.sonatype.nexus.blobstore.api.BlobAttributesConstants.SHA1_HASH_ATTRIBUTE;
 
 /**
  * A data holder for the content of each blob's .attribs.
  */
-public class S3BlobAttributes
+public class S3BlobAttributes implements BlobAttributes
 {
-  private static final String SHA1_HASH_ATTRIBUTE = "sha1";
-
-  private static final String CONTENT_SIZE_ATTRIBUTE = "size";
-
-  private static final String CREATION_TIME_ATTRIBUTE = "creationTime";
-
-  private static final String DELETED_ATTRIBUTE = "deleted";
-
-  public static final String HEADER_PREFIX = "@";
-
   private Map<String, String> headers;
 
   private BlobMetrics metrics;
 
   private boolean deleted = false;
+
+  private String deletedReason;
 
   private final S3PropertiesFile propertiesFile;
 
@@ -61,20 +60,34 @@ public class S3BlobAttributes
     this.metrics = checkNotNull(metrics);
   }
 
+  @Override
   public Map<String, String> getHeaders() {
     return headers;
   }
 
+  @Override
   public BlobMetrics getMetrics() {
     return metrics;
   }
 
+  @Override
   public boolean isDeleted() {
     return deleted;
   }
 
+  @Override
   public void setDeleted(final boolean deleted) {
     this.deleted = deleted;
+  }
+
+  @Override
+  public void setDeletedReason(final String deletedReason) {
+    this.deletedReason = deletedReason;
+  }
+
+  @Override
+  public String getDeletedReason() {
+    return deletedReason != null ? deletedReason : "No reason supplied";
   }
 
   public boolean load() throws IOException {
@@ -89,6 +102,11 @@ public class S3BlobAttributes
   public void store() throws IOException {
     writeTo(propertiesFile);
     propertiesFile.store();
+  }
+
+  @Override
+  public Properties getProperties() {
+    return new Properties(propertiesFile);
   }
 
   private void readFrom(Properties properties) {
@@ -106,6 +124,7 @@ public class S3BlobAttributes
         Long.parseLong(properties.getProperty(CONTENT_SIZE_ATTRIBUTE)));
 
     deleted = properties.containsKey(DELETED_ATTRIBUTE);
+    deletedReason = properties.getProperty(DELETED_REASON_ATTRIBUTE);
   }
 
   private Properties writeTo(final Properties properties) {
@@ -119,6 +138,7 @@ public class S3BlobAttributes
 
     if (deleted) {
       properties.put(DELETED_ATTRIBUTE, Boolean.toString(deleted));
+      properties.put(DELETED_REASON_ATTRIBUTE, getDeletedReason());
     }
     return properties;
   }
