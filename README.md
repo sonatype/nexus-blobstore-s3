@@ -27,6 +27,25 @@ Contribution Guidelines
 Go read [our contribution guidelines](/.github/CONTRIBUTING.md) to get a bit more familiar with how
 we would like things to flow.
 
+Requirements
+------------
+
+* [Apache Maven 3.3.3+](https://maven.apache.org/install.html)
+* [Java 8+](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html)
+* Network access to https://repository.sonatype.org/content/groups/sonatype-public-grid
+
+Also, there is a good amount of information available at [Bundle Development](https://books.sonatype.com/nexus-book/reference3/bundle-development.html#bundle-development-overview)
+
+Building
+--------
+
+To build the project and generate the bundle use Maven
+
+    mvn clean install
+
+If everything checks out, the nexus-blobstore-s3 bundle  should be available in the `target` folder
+
+
 Installing
 ----------
 
