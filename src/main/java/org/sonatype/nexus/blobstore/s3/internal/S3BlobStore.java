@@ -37,6 +37,7 @@ import org.sonatype.nexus.blobstore.api.BlobStore;
 import org.sonatype.nexus.blobstore.api.BlobStoreConfiguration;
 import org.sonatype.nexus.blobstore.api.BlobStoreException;
 import org.sonatype.nexus.blobstore.api.BlobStoreMetrics;
+import org.sonatype.nexus.blobstore.api.BlobStoreUsageChecker;
 import org.sonatype.nexus.common.stateguard.Guarded;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
 
@@ -44,6 +45,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import com.google.common.hash.HashCode;
 import org.joda.time.DateTime;
+import org.slf4j.Logger;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.iterable.S3Objects;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -371,6 +373,12 @@ public class S3BlobStore
   @Override
   @Guarded(by = STARTED)
   public synchronized void compact() {
+    compact(null, null);
+  }
+
+  @Override
+  @Guarded(by = STARTED)
+  public synchronized void compact(@Nullable final BlobStoreUsageChecker inUseChecker, @Nullable final Logger logger) {
       // no-op
   }
 
