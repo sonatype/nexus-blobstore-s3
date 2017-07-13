@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import java.util.concurrent.locks.Lock;
 
 import javax.annotation.Nullable;
@@ -44,8 +45,10 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.hash.HashCode;
 import org.joda.time.DateTime;
 import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.iterable.S3Objects;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.transfer.TransferManager;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -457,7 +460,13 @@ public class S3BlobStore
 
   @Override
   public Stream<BlobId> getBlobIdStream() {
-    throw new UnsupportedOperationException();
+    Iterable<S3ObjectSummary> summaries = S3Objects.withPrefix(s3, getConfiguredBucket(), CONTENT_PREFIX);
+    return StreamSupport.stream(summaries.spliterator(), false)
+      .map(S3ObjectSummary::getKey)
+      .map(key -> key.substring(key.lastIndexOf('/') + 1, key.length()))
+      .filter(filename -> filename.endsWith(BLOB_ATTRIBUTE_SUFFIX) && !filename.startsWith(TEMPORARY_BLOB_ID_PREFIX))
+      .map(filename -> filename.substring(0, filename.length() - BLOB_ATTRIBUTE_SUFFIX.length()))
+      .map(BlobId::new);
   }
 
   @Override
