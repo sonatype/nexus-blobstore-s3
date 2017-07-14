@@ -76,6 +76,12 @@ public class S3BlobStoreDescriptor
 
     @DefaultMessage("AWS Region")
     String regionHelp();
+
+    @DefaultMessage("Endpoint URL")
+    String endpointLabel();
+
+    @DefaultMessage("AWS Endpoint URL")
+    String endpointHelp();
   }
 
   private static final Messages messages = I18N.create(Messages.class);
@@ -86,6 +92,7 @@ public class S3BlobStoreDescriptor
   private final FormField sessionToken;
   private final FormField assumeRole;
   private final FormField region;
+  private final FormField endpoint;
 
   public S3BlobStoreDescriptor() {
     this.bucket = new StringTextFormField(
@@ -124,6 +131,12 @@ public class S3BlobStoreDescriptor
         messages.regionHelp(),
         FormField.OPTIONAL
     );
+    this.endpoint = new StringTextFormField(
+        S3BlobStore.ENDPOINT_KEY,
+        messages.endpointLabel(),
+        messages.endpointHelp(),
+        FormField.OPTIONAL
+    );
   }
 
   @Override
@@ -133,6 +146,6 @@ public class S3BlobStoreDescriptor
 
   @Override
   public List<FormField> getFormFields() {
-      return Arrays.asList(bucket, accessKeyId, secretAccessKey, sessionToken, assumeRole, region);
+      return Arrays.asList(bucket, accessKeyId, secretAccessKey, sessionToken, assumeRole, region, endpoint);
   }
 }
