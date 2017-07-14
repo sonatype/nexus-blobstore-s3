@@ -90,6 +90,8 @@ public class S3BlobStore
 
   public static final String REGION_KEY = "region";
 
+  public static final String ENDPOINT_KEY = "endpoint";
+
   public static final String METADATA_FILENAME = "metadata.properties";
 
   public static final String TYPE_KEY = "type";
@@ -390,7 +392,7 @@ public class S3BlobStore
       setConfiguredBucket(getConfiguredBucket());
     }
     catch (Exception e) {
-        throw new BlobStoreException("Unable to initialize blob store bucket: " + getConfiguredBucket(), e, null);
+      throw new BlobStoreException("Unable to initialize blob store bucket: " + getConfiguredBucket(), e, null);
     }
   }
 
