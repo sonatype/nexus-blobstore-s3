@@ -16,6 +16,7 @@ import javax.inject.Named;
 
 import org.sonatype.nexus.blobstore.api.BlobStoreConfiguration;
 
+import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
@@ -29,6 +30,7 @@ import com.google.common.base.Strings;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.ACCESS_KEY_ID_KEY;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.ASSUME_ROLE_KEY;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.CONFIG_KEY;
+import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.ENDPOINT_KEY;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.REGION_KEY;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.SECRET_ACCESS_KEY_KEY;
 import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.SESSION_TOKEN_KEY;
@@ -70,7 +72,12 @@ public class AmazonS3Factory
 
     String region = blobStoreConfiguration.attributes(CONFIG_KEY).get(REGION_KEY, String.class);
     if (!Strings.isNullOrEmpty(region)) {
-      builder = builder.withRegion(region);
+      String endpoint = blobStoreConfiguration.attributes(CONFIG_KEY).get(ENDPOINT_KEY, String.class);
+      if (!Strings.isNullOrEmpty(endpoint)) {
+        builder = builder.withEndpointConfiguration(new AmazonS3ClientBuilder.EndpointConfiguration(endpoint, region));
+      } else {
+        builder = builder.withRegion(region);
+      }
     }
 
     return builder.build();
