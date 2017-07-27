@@ -45,7 +45,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import com.google.common.hash.HashCode;
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.iterable.S3Objects;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -375,12 +374,12 @@ public class S3BlobStore
   @Override
   @Guarded(by = STARTED)
   public synchronized void compact() {
-    compact(null, null);
+    compact(null);
   }
 
   @Override
   @Guarded(by = STARTED)
-  public synchronized void compact(@Nullable final BlobStoreUsageChecker inUseChecker, @Nullable final Logger logger) {
+  public synchronized void compact(@Nullable final BlobStoreUsageChecker inUseChecker) {
       // no-op
   }
 
