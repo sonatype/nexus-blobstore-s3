@@ -57,7 +57,7 @@ public class S3PropertiesFileTest
     then:
       1 * s3.putObject('mybucket', 'mykey', _, _) >> { bucket, key, bytes, metadata ->
         def text = bytes.text
-        assert text.contains('testProperty=newValue\n')
+        assert text.contains('testProperty=newValue' + System.lineSeparator())
         assert metadata.contentLength == text.length()
       }
   }
