@@ -37,6 +37,7 @@ import org.sonatype.nexus.blobstore.api.BlobStore;
 import org.sonatype.nexus.blobstore.api.BlobStoreConfiguration;
 import org.sonatype.nexus.blobstore.api.BlobStoreException;
 import org.sonatype.nexus.blobstore.api.BlobStoreMetrics;
+import org.sonatype.nexus.blobstore.api.BlobStoreUsageChecker;
 import org.sonatype.nexus.common.stateguard.Guarded;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
 
@@ -373,6 +374,12 @@ public class S3BlobStore
   @Override
   @Guarded(by = STARTED)
   public synchronized void compact() {
+      // no-op
+  }
+
+  @Override
+  @Guarded(by = STARTED)
+  public void compact(@Nullable BlobStoreUsageChecker blobStoreUsageChecker) {
       // no-op
   }
 
