@@ -314,6 +314,13 @@ public class S3BlobStore
     return blob;
   }
 
+  @Nullable
+  @Override
+  public Blob get(final BlobId blobId, final boolean includeDeleted) {
+    // at time of writing, no soft delete, so includeDeleted can be ignored
+    return get(blobId);
+  }
+
   @Override
   @Guarded(by = STARTED)
   public boolean delete(final BlobId blobId, String reason) {
