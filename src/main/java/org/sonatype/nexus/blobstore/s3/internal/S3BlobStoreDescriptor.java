@@ -21,6 +21,7 @@ import org.sonatype.goodies.i18n.I18N;
 import org.sonatype.goodies.i18n.MessageBundle;
 import org.sonatype.nexus.blobstore.BlobStoreDescriptor;
 import org.sonatype.nexus.formfields.FormField;
+import org.sonatype.nexus.formfields.NumberTextFormField;
 import org.sonatype.nexus.formfields.PasswordFormField;
 import org.sonatype.nexus.formfields.StringTextFormField;
 
@@ -82,6 +83,12 @@ public class S3BlobStoreDescriptor
 
     @DefaultMessage("AWS Endpoint URL")
     String endpointHelp();
+
+    @DefaultMessage("Expiration Days")
+    String expirationLabel();
+
+    @DefaultMessage("How many days until deleted blobs are finally removed from the S3 bucket")
+    String expirationHelp();
   }
 
   private static final Messages messages = I18N.create(Messages.class);
@@ -93,6 +100,7 @@ public class S3BlobStoreDescriptor
   private final FormField assumeRole;
   private final FormField region;
   private final FormField endpoint;
+  private final FormField expiration;
 
   public S3BlobStoreDescriptor() {
     this.bucket = new StringTextFormField(
@@ -137,6 +145,13 @@ public class S3BlobStoreDescriptor
         messages.endpointHelp(),
         FormField.OPTIONAL
     );
+    this.expiration = new NumberTextFormField(
+        S3BlobStore.EXPIRATION_KEY,
+        messages.expirationLabel(),
+        messages.expirationHelp(),
+        FormField.OPTIONAL)
+        .withInitialValue(S3BlobStore.DEFAULT_EXPIRATION_IN_DAYS)
+        .withMinimumValue(1);
   }
 
   @Override
@@ -146,6 +161,6 @@ public class S3BlobStoreDescriptor
 
   @Override
   public List<FormField> getFormFields() {
-      return Arrays.asList(bucket, accessKeyId, secretAccessKey, sessionToken, assumeRole, region, endpoint);
+      return Arrays.asList(bucket, accessKeyId, secretAccessKey, sessionToken, assumeRole, region, endpoint, expiration);
   }
 }

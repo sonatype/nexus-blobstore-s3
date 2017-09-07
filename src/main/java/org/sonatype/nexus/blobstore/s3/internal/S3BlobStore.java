@@ -99,6 +99,10 @@ public class S3BlobStore
 
   public static final String ENDPOINT_KEY = "endpoint";
 
+  public static final String EXPIRATION_KEY = "expiration";
+
+  public static final int DEFAULT_EXPIRATION_IN_DAYS = 3;
+
   public static final String METADATA_FILENAME = "metadata.properties";
 
   public static final String TYPE_KEY = "type";
@@ -124,8 +128,6 @@ public class S3BlobStore
   private LoadingCache<BlobId, S3Blob> liveBlobs;
 
   private AmazonS3 s3;
-
-  private final int expirationInDays = 3;
 
   @Inject
   public S3BlobStore(final AmazonS3Factory amazonS3Factory,
@@ -445,7 +447,7 @@ public class S3BlobStore
         BucketLifecycleConfiguration lifecycleConfiguration = s3.getBucketLifecycleConfiguration(getConfiguredBucket());
         if (lifecycleConfiguration == null ||
             !lifecycleConfiguration.getRules().stream()
-                .filter(r -> r.getExpirationInDays() == expirationInDays)
+                .filter(r -> r.getExpirationInDays() == getConfiguredExpirationInDays())
                 .filter(r -> {
                   LifecycleFilterPredicate predicate = r.getFilter().getPredicate();
                   if (predicate instanceof LifecycleTagPredicate) {
@@ -478,7 +480,9 @@ public class S3BlobStore
   }
 
   private void addBucketLifecycleConfiguration() {
-    s3.setBucketLifecycleConfiguration(getConfiguredBucket(), makeLifecycleConfiguration(expirationInDays));
+    s3.setBucketLifecycleConfiguration(
+        getConfiguredBucket(),
+        makeLifecycleConfiguration(getConfiguredExpirationInDays()));
   }
 
   private boolean delete(final String path) throws IOException {
@@ -497,6 +501,12 @@ public class S3BlobStore
 
   private String getConfiguredBucket() {
     return blobStoreConfiguration.attributes(CONFIG_KEY).require(BUCKET_KEY).toString();
+  }
+
+  private int getConfiguredExpirationInDays() {
+    return Integer.parseInt(
+        blobStoreConfiguration.attributes(CONFIG_KEY).get(EXPIRATION_KEY, DEFAULT_EXPIRATION_IN_DAYS).toString()
+    );
   }
 
   /**
