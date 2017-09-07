@@ -2,7 +2,7 @@
 
 export S3_BLOBSTORE_VERSION=1.1.0-SNAPSHOT
 export NEXUS_HOME=../nexus-professional-3.5.1-02
-# export NEXUS_HOME=../nexus-internal/target/nexus-professional-3.4.0-SNAPSHOT
+# export NEXUS_HOME=../nexus-internal/target/nexus-professional-3.6.0-SNAPSHOT
 
 mkdir -p ${NEXUS_HOME}/system/org/sonatype/nexus/nexus-blobstore-s3/${S3_BLOBSTORE_VERSION}/
 cp target/nexus-blobstore-s3-*.jar ${NEXUS_HOME}/system/org/sonatype/nexus/nexus-blobstore-s3/${S3_BLOBSTORE_VERSION}/
