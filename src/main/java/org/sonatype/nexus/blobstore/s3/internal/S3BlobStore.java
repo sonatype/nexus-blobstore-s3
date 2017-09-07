@@ -77,9 +77,9 @@ public class S3BlobStore
 
   public static final String BLOB_ATTRIBUTE_SUFFIX = ".properties";
 
-  public static final String CONFIG_KEY = "file";
+  public static final String CONFIG_KEY = "s3";
 
-  public static final String BUCKET_KEY = "path";
+  public static final String BUCKET_KEY = "bucket";
 
   public static final String ACCESS_KEY_ID_KEY = "accessKeyId";
 
@@ -314,6 +314,13 @@ public class S3BlobStore
     return blob;
   }
 
+  @Nullable
+  @Override
+  public Blob get(final BlobId blobId, final boolean includeDeleted) {
+    // at time of writing, no soft delete, so includeDeleted can be ignored
+    return get(blobId);
+  }
+
   @Override
   @Guarded(by = STARTED)
   public boolean delete(final BlobId blobId, String reason) {
@@ -374,12 +381,12 @@ public class S3BlobStore
   @Override
   @Guarded(by = STARTED)
   public synchronized void compact() {
-      // no-op
+    compact(null);
   }
 
   @Override
   @Guarded(by = STARTED)
-  public void compact(@Nullable BlobStoreUsageChecker blobStoreUsageChecker) {
+  public synchronized void compact(@Nullable final BlobStoreUsageChecker inUseChecker) {
       // no-op
   }
 

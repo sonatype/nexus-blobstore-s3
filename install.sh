@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-export S3_BLOBSTORE_VERSION=1.0.1-SNAPSHOT
+export S3_BLOBSTORE_VERSION=1.1.0-SNAPSHOT
 export NEXUS_HOME=../nexus-professional-3.5.1-02
 # export NEXUS_HOME=../nexus-internal/target/nexus-professional-3.6.0-SNAPSHOT
 
