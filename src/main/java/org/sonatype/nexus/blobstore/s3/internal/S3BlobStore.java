@@ -12,19 +12,20 @@
  */
 package org.sonatype.nexus.blobstore.s3.internal;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Path;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
-import java.util.concurrent.locks.Lock;
-
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Named;
-
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.iterable.S3Objects;
+import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
+import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
+import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
+import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
+import com.amazonaws.services.s3.model.PartETag;
+import com.amazonaws.services.s3.model.S3Object;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.UploadPartRequest;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.LoadingCache;
+import com.google.common.hash.HashCode;
+import org.joda.time.DateTime;
 import org.sonatype.nexus.blobstore.BlobSupport;
 import org.sonatype.nexus.blobstore.LocationStrategy;
 import org.sonatype.nexus.blobstore.MetricsInputStream;
@@ -40,17 +41,31 @@ import org.sonatype.nexus.blobstore.api.BlobStoreMetrics;
 import org.sonatype.nexus.blobstore.api.BlobStoreUsageChecker;
 import org.sonatype.nexus.common.stateguard.Guarded;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
+import org.sonatype.nexus.security.subject.FakeAlmightySubject;
+import org.sonatype.nexus.thread.NexusExecutorService;
+import org.sonatype.nexus.thread.NexusThreadFactory;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
-import com.google.common.hash.HashCode;
-import org.joda.time.DateTime;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.iterable.S3Objects;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
-import com.amazonaws.services.s3.transfer.TransferManager;
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Named;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -103,6 +118,10 @@ public class S3BlobStore
 
   public static final String TEMPORARY_BLOB_ID_PREFIX = "tmp$";
 
+  private static final int CHUNK_SIZE=10*1024*1024; // 10Mb chunk size
+
+  private static final ExecutorService executor=makeExecutorService();
+
   private final AmazonS3Factory amazonS3Factory;
 
   private final LocationStrategy permanentLocationStrategy;
@@ -128,6 +147,16 @@ public class S3BlobStore
     this.temporaryLocationStrategy = checkNotNull(temporaryLocationStrategy);
     this.storeMetrics = checkNotNull(storeMetrics);
   }
+
+  private static ExecutorService makeExecutorService() {
+    BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
+    ThreadFactory factory = new NexusThreadFactory("S3", "s3BlobStore");
+    ThreadPoolExecutor backing =
+            new ThreadPoolExecutor(2, 10, 1, TimeUnit.SECONDS, queue, factory);
+    backing.allowCoreThreadTimeOut(true);
+    return NexusExecutorService.forFixedSubject(backing, FakeAlmightySubject.TASK_SUBJECT);
+  }
+
 
   @Override
   protected void doStart() throws Exception {
@@ -199,16 +228,67 @@ public class S3BlobStore
     checkNotNull(blobData);
 
     return create(headers, destination -> {
+        InitiateMultipartUploadRequest initRequest = new InitiateMultipartUploadRequest(getConfiguredBucket(), destination);
+        InitiateMultipartUploadResult initResponse = s3.initiateMultipartUpload(initRequest);
+
         try (InputStream data = blobData) {
           MetricsInputStream input = new MetricsInputStream(data);
-          TransferManager transferManager = new TransferManager(s3);
-          transferManager.upload(getConfiguredBucket(), destination, input, new ObjectMetadata())
-              .waitForCompletion();
+
+          List<Future<PartETag>> futureETags = new ArrayList<>();
+          UploadPartRequest newPart;
+          while ((newPart=buildNewPart(input, destination, initResponse.getUploadId(), futureETags.size()+1))!=null) {
+            UploadPartRequest wp=newPart;
+            futureETags.add(executor.submit(()->s3.uploadPart(wp).getPartETag()));
+          }
+
+          List<PartETag> partETags=new ArrayList<>(futureETags.size());
+          while (!futureETags.isEmpty()) {
+            Future<PartETag> f = futureETags.remove(0);
+            partETags.add(f.get());
+          }
+
+          CompleteMultipartUploadRequest compRequest = new CompleteMultipartUploadRequest(
+              getConfiguredBucket(),
+              destination,
+              initResponse.getUploadId(),
+              partETags);
+          s3.completeMultipartUpload(compRequest);
           return input.getMetrics();
-        } catch (InterruptedException e) {
+        }catch(Exception e){
+          try{
+            s3.abortMultipartUpload(
+                new AbortMultipartUploadRequest(getConfiguredBucket() , destination, initResponse.getUploadId()));
+          }catch(Exception ex){
+            log.error("Error cleaning a multipart upload on S3: {} / {}", getConfiguredBucket() , destination);
+          }
           throw new BlobStoreException("error uploading blob", e, null);
         }
       });
+  }
+
+  private UploadPartRequest buildNewPart(InputStream data, String destination, String uploadId, int part) throws IOException{
+    byte[] buffer=new byte[CHUNK_SIZE];
+    int pos=0;
+    int remain=CHUNK_SIZE;
+    int lastSize=0;
+
+    // Fill the buffer fully if possible
+    while (remain>0 && lastSize>=0){
+      lastSize=data.read(buffer, pos, remain);
+      if (lastSize>0){
+        pos+=lastSize;
+        remain-=lastSize;
+      }
+    }
+    if (pos==0){
+      return null;
+    }
+    return new UploadPartRequest()
+            .withBucketName(getConfiguredBucket()).withKey(destination)
+            .withUploadId(uploadId).withPartNumber(part)
+            .withInputStream(new ByteArrayInputStream(buffer))
+            .withPartSize(pos)
+            .withLastPart(remain>0);
   }
 
   @Override
