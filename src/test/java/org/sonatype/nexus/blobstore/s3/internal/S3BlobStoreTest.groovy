@@ -12,23 +12,22 @@
  */
 package org.sonatype.nexus.blobstore.s3.internal
 
-import java.io.ByteArrayInputStream
-
 import org.sonatype.nexus.blobstore.LocationStrategy
 import org.sonatype.nexus.blobstore.api.BlobId
 import org.sonatype.nexus.blobstore.api.BlobStoreConfiguration
 
-import com.google.inject.util.Providers
 import com.amazonaws.services.s3.AmazonS3
-import com.amazonaws.services.s3.AmazonS3ClientBuilder
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
 import com.amazonaws.services.s3.model.S3Object
 import com.amazonaws.services.s3.model.S3ObjectInputStream
+import com.amazonaws.services.s3.model.lifecycle.LifecycleFilter
+import com.amazonaws.services.s3.model.lifecycle.LifecycleTagPredicate
 import spock.lang.Specification
 
 /**
  * {@link S3BlobStore} tests.
  */
-public class S3BlobStoreTest
+class S3BlobStoreTest
     extends Specification
 {
 
@@ -62,6 +61,7 @@ public class S3BlobStoreTest
       """.stripMargin())
       def contentS3Object = mockS3Object('hello world')
       1 * s3.doesBucketExist('mybucket') >> true
+      1 * s3.getBucketLifecycleConfiguration('mybucket') >> blobStore.makeLifecycleConfiguration(7)
       1 * s3.doesObjectExist('mybucket', 'metadata.properties') >> false
       1 * s3.doesObjectExist('mybucket', 'content/test.properties') >> true
       1 * s3.getObject('mybucket', 'content/test.properties') >> attributesS3Object
