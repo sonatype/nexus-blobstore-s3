@@ -120,7 +120,7 @@ public class S3BlobStore
 
   private static final int CHUNK_SIZE=10*1024*1024; // 10Mb chunk size
 
-  private static final ExecutorService executor=makeExecutorService();
+  private static final ExecutorService executor = makeExecutorService();
 
   private final AmazonS3Factory amazonS3Factory;
 
@@ -156,7 +156,6 @@ public class S3BlobStore
     backing.allowCoreThreadTimeOut(true);
     return NexusExecutorService.forFixedSubject(backing, FakeAlmightySubject.TASK_SUBJECT);
   }
-
 
   @Override
   protected void doStart() throws Exception {
@@ -236,12 +235,12 @@ public class S3BlobStore
 
           List<Future<PartETag>> futureETags = new ArrayList<>();
           UploadPartRequest newPart;
-          while ((newPart=buildNewPart(input, destination, initResponse.getUploadId(), futureETags.size()+1))!=null) {
-            UploadPartRequest wp=newPart;
-            futureETags.add(executor.submit(()->s3.uploadPart(wp).getPartETag()));
+          while ((newPart = buildNewPart(input, destination, initResponse.getUploadId(), futureETags.size() + 1)) != null) {
+            UploadPartRequest wp = newPart;
+            futureETags.add(executor.submit(() -> s3.uploadPart(wp).getPartETag()));
           }
 
-          List<PartETag> partETags=new ArrayList<>(futureETags.size());
+          List<PartETag> partETags = new ArrayList<>(futureETags.size());
           while (!futureETags.isEmpty()) {
             Future<PartETag> f = futureETags.remove(0);
             partETags.add(f.get());
@@ -254,33 +253,39 @@ public class S3BlobStore
               partETags);
           s3.completeMultipartUpload(compRequest);
           return input.getMetrics();
-        }catch(Exception e){
-          try{
+        }
+        catch(Exception e) {
+          try {
             s3.abortMultipartUpload(
                 new AbortMultipartUploadRequest(getConfiguredBucket() , destination, initResponse.getUploadId()));
-          }catch(Exception ex){
-            log.error("Error cleaning a multipart upload on S3: {} / {}", getConfiguredBucket() , destination);
+          }
+          catch(Exception ex) {
+            log.error("Error cleaning a multipart upload on S3: {} / {}", getConfiguredBucket(), destination);
           }
           throw new BlobStoreException("error uploading blob", e, null);
         }
       });
   }
 
-  private UploadPartRequest buildNewPart(InputStream data, String destination, String uploadId, int part) throws IOException{
-    byte[] buffer=new byte[CHUNK_SIZE];
-    int pos=0;
-    int remain=CHUNK_SIZE;
-    int lastSize=0;
+  private UploadPartRequest buildNewPart(final InputStream data,
+                                         final String destination,
+                                         final String uploadId,
+                                         int part)
+      throws IOException {
+    byte[] buffer = new byte[CHUNK_SIZE];
+    int pos = 0;
+    int remain = CHUNK_SIZE;
+    int lastSize = 0;
 
     // Fill the buffer fully if possible
-    while (remain>0 && lastSize>=0){
-      lastSize=data.read(buffer, pos, remain);
-      if (lastSize>0){
-        pos+=lastSize;
-        remain-=lastSize;
+    while (remain > 0 && lastSize >= 0) {
+      lastSize = data.read(buffer, pos, remain);
+      if (lastSize > 0) {
+        pos += lastSize;
+        remain -= lastSize;
       }
     }
-    if (pos==0){
+    if (pos == 0){
       return null;
     }
     return new UploadPartRequest()
