@@ -40,13 +40,9 @@ class S3BlobStoreTest
 
   S3BlobStore blobStore = new S3BlobStore(amazonS3Factory, permanentLocationStrategy, temporaryLocationStrategy, storeMetrics)
 
-  def "Get blob"() {
-    given: 'A mocked S3 setup'
-      permanentLocationStrategy.location(_) >> { args -> args[0].toString() }
-      amazonS3Factory.create(_) >> s3
-      def config = new BlobStoreConfiguration()
-      config.attributes = [s3: [bucket: 'mybucket']]
-      def attributesS3Object = mockS3Object("""\
+  def config = new BlobStoreConfiguration()
+
+  def attributesContents = """\
         |#Thu Jun 01 23:10:55 UTC 2017
         |@BlobStore.created-by=admin
         |size=11
@@ -55,7 +51,17 @@ class S3BlobStoreTest
         |@BlobStore.content-type=text/plain
         |@BlobStore.blob-name=test
         |sha1=eb4c2a5a1c04ca2d504c5e57e1f88cef08c75707
-      """.stripMargin())
+      """.stripMargin()
+
+  def setup() {
+    permanentLocationStrategy.location(_) >> { args -> args[0].toString() }
+    amazonS3Factory.create(_) >> s3
+    config.attributes = [s3: [bucket: 'mybucket']]
+  }
+
+  def "Get blob"() {
+    given: 'A mocked S3 setup'
+      def attributesS3Object = mockS3Object(attributesContents)
       def contentS3Object = mockS3Object('hello world')
       1 * s3.doesBucketExist('mybucket') >> true
       1 * s3.getBucketLifecycleConfiguration('mybucket') >> blobStore.makeLifecycleConfiguration(S3BlobStore.DEFAULT_EXPIRATION_IN_DAYS)
@@ -71,6 +77,46 @@ class S3BlobStoreTest
 
     then: 'The contents are read from s3'
       blob.inputStream.text == 'hello world'
+  }
+
+  def 'set lifecycle on pre-existing bucket if not present'() {
+    given: 'bucket already exists, but has null lifecycle configuration'
+      s3.doesBucketExist('mybucket') >> true
+
+    when: 'init fires'
+      blobStore.init(config)
+
+    then: 'lifecycle configuration is added'
+      1 * s3.setBucketLifecycleConfiguration('mybucket', !null)
+  }
+
+  def 'soft delete successful'() {
+    given: 'blob exists'
+      blobStore.init(config)
+      blobStore.doStart()
+      def attributesS3Object = mockS3Object(attributesContents)
+      1 * s3.doesObjectExist('mybucket', 'content/soft-delete-success.properties') >> true
+      1 * s3.getObject('mybucket', 'content/soft-delete-success.properties') >> attributesS3Object
+
+    when: 'blob is deleted'
+      def deleted = blobStore.delete(new BlobId('soft-delete-success'), 'successful test')
+
+    then: 'deleted tag is added'
+      deleted == true
+      1 * s3.setObjectTagging(!null)
+  }
+
+  def 'soft delete returns false when blob does not exist'() {
+    given: 'blob store setup'
+      blobStore.init(config)
+      blobStore.doStart()
+
+    when: 'nonexistent blob is deleted'
+      def deleted = blobStore.delete(new BlobId('soft-delete-fail'), 'test')
+
+    then: 'deleted tag is added'
+      deleted == false
+      0 * s3.setObjectTagging(!null)
   }
 
   private mockS3Object(String contents) {
