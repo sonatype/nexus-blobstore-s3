@@ -315,7 +315,6 @@ public class S3BlobStore
   }
 
   @Nullable
-  @Override
   public Blob get(final BlobId blobId, final boolean includeDeleted) {
     // at time of writing, no soft delete, so includeDeleted can be ignored
     return get(blobId);
