@@ -115,6 +115,8 @@ public class S3BlobStore
 
   static final Tag DELETED_TAG = new Tag("deleted", "true");
 
+  static final String LIFECYCLE_EXPIRATION_RULE_ID = "Expire soft-deleted blobstore objects";
+
   private final AmazonS3Factory amazonS3Factory;
 
   private final LocationStrategy permanentLocationStrategy;
@@ -441,23 +443,12 @@ public class S3BlobStore
       if (!s3.doesBucketExist(getConfiguredBucket())) {
         s3.createBucket(getConfiguredBucket());
 
-        addBucketLifecycleConfiguration();
+        addBucketLifecycleConfiguration(null);
       } else {
         // bucket exists, we should test that the correct lifecycle config is present
         BucketLifecycleConfiguration lifecycleConfiguration = s3.getBucketLifecycleConfiguration(getConfiguredBucket());
-        if (lifecycleConfiguration == null ||
-            !lifecycleConfiguration.getRules().stream()
-                .filter(r -> r.getExpirationInDays() == getConfiguredExpirationInDays())
-                .filter(r -> {
-                  LifecycleFilterPredicate predicate = r.getFilter().getPredicate();
-                  if (predicate instanceof LifecycleTagPredicate) {
-                    LifecycleTagPredicate tagPredicate = (LifecycleTagPredicate) predicate;
-                    return DELETED_TAG.equals(tagPredicate.getTag());
-                  }
-                  return false;
-                })
-                .findAny().isPresent()) {
-          addBucketLifecycleConfiguration();
+        if (!isExpirationLifecycleConfigurationPresent(lifecycleConfiguration)) {
+          addBucketLifecycleConfiguration(lifecycleConfiguration);
         }
       }
 
@@ -468,21 +459,42 @@ public class S3BlobStore
     }
   }
 
-  BucketLifecycleConfiguration makeLifecycleConfiguration(int expirationInDays) {
+  boolean isExpirationLifecycleConfigurationPresent(BucketLifecycleConfiguration lifecycleConfiguration) {
+    return lifecycleConfiguration != null &&
+        lifecycleConfiguration.getRules() != null &&
+        lifecycleConfiguration.getRules().stream()
+        .filter(r -> r.getExpirationInDays() == getConfiguredExpirationInDays())
+        .filter(r -> {
+          LifecycleFilterPredicate predicate = r.getFilter().getPredicate();
+          if (predicate instanceof LifecycleTagPredicate) {
+            LifecycleTagPredicate tagPredicate = (LifecycleTagPredicate) predicate;
+            return DELETED_TAG.equals(tagPredicate.getTag());
+          }
+          return false;
+        })
+        .findAny().isPresent();
+  }
+
+  BucketLifecycleConfiguration makeLifecycleConfiguration(BucketLifecycleConfiguration existing, int expirationInDays) {
     BucketLifecycleConfiguration.Rule rule = new BucketLifecycleConfiguration.Rule()
-        .withId("Expire soft-deleted blobstore objects")
+        .withId(LIFECYCLE_EXPIRATION_RULE_ID)
         .withFilter(new LifecycleFilter(
             new LifecycleTagPredicate(DELETED_TAG)))
         .withExpirationInDays(expirationInDays)
         .withStatus(BucketLifecycleConfiguration.ENABLED.toString());
 
-    return new BucketLifecycleConfiguration().withRules(rule);
+    if (existing != null) {
+      existing.getRules().add(rule);
+      return existing;
+    } else {
+      return new BucketLifecycleConfiguration().withRules(rule);
+    }
   }
 
-  private void addBucketLifecycleConfiguration() {
+  private void addBucketLifecycleConfiguration(BucketLifecycleConfiguration lifecycleConfiguration) {
     s3.setBucketLifecycleConfiguration(
         getConfiguredBucket(),
-        makeLifecycleConfiguration(getConfiguredExpirationInDays()));
+        makeLifecycleConfiguration(lifecycleConfiguration, getConfiguredExpirationInDays()));
   }
 
   private boolean delete(final String path) throws IOException {
