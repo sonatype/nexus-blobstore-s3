@@ -15,6 +15,7 @@ package org.sonatype.nexus.blobstore.s3.internal;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -41,6 +42,13 @@ import org.sonatype.nexus.blobstore.api.BlobStoreUsageChecker;
 import org.sonatype.nexus.common.stateguard.Guarded;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
 
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration;
+import com.amazonaws.services.s3.model.ObjectTagging;
+import com.amazonaws.services.s3.model.SetObjectTaggingRequest;
+import com.amazonaws.services.s3.model.Tag;
+import com.amazonaws.services.s3.model.lifecycle.LifecycleFilter;
+import com.amazonaws.services.s3.model.lifecycle.LifecycleFilterPredicate;
+import com.amazonaws.services.s3.model.lifecycle.LifecycleTagPredicate;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import com.google.common.hash.HashCode;
@@ -69,8 +77,6 @@ public class S3BlobStore
     extends StateGuardLifecycleSupport
     implements BlobStore
 {
-  public static final String BASEDIR = "blobs";
-
   public static final String TYPE = "S3";
 
   public static final String BLOB_CONTENT_SUFFIX = ".bytes";
@@ -93,6 +99,10 @@ public class S3BlobStore
 
   public static final String ENDPOINT_KEY = "endpoint";
 
+  public static final String EXPIRATION_KEY = "expiration";
+
+  public static final int DEFAULT_EXPIRATION_IN_DAYS = 3;
+
   public static final String METADATA_FILENAME = "metadata.properties";
 
   public static final String TYPE_KEY = "type";
@@ -102,6 +112,10 @@ public class S3BlobStore
   public static final String CONTENT_PREFIX = "content";
 
   public static final String TEMPORARY_BLOB_ID_PREFIX = "tmp$";
+
+  static final Tag DELETED_TAG = new Tag("deleted", "true");
+
+  static final String LIFECYCLE_EXPIRATION_RULE_ID = "Expire soft-deleted blobstore objects";
 
   private final AmazonS3Factory amazonS3Factory;
 
@@ -167,20 +181,6 @@ public class S3BlobStore
    */
   private String attributePath(final BlobId id) {
     return getLocation(id) + BLOB_ATTRIBUTE_SUFFIX;
-  }
-
-  /**
-   * Returns a path for a temporary blob-id content file relative to root directory.
-   */
-  private String temporaryContentPath(final BlobId id, final UUID suffix) {
-    return temporaryLocationStrategy.location(id) + "." + suffix + BLOB_CONTENT_SUFFIX;
-  }
-
-  /**
-   * Returns path for a temporary blob-id attribute file relative to root directory.
-   */
-  private String temporaryAttributePath(final BlobId id, final UUID suffix) {
-    return temporaryLocationStrategy.location(id) + "." + suffix + BLOB_ATTRIBUTE_SUFFIX;
   }
 
   /**
@@ -278,6 +278,12 @@ public class S3BlobStore
   @Override
   @Guarded(by = STARTED)
   public Blob get(final BlobId blobId) {
+    return get(blobId, false);
+  }
+
+  @Nullable
+  @Override
+  public Blob get(final BlobId blobId, final boolean includeDeleted) {
     checkNotNull(blobId);
 
     final S3Blob blob = liveBlobs.getUnchecked(blobId);
@@ -293,7 +299,7 @@ public class S3BlobStore
             return null;
           }
 
-          if (blobAttributes.isDeleted()) {
+          if (blobAttributes.isDeleted() && !includeDeleted) {
             log.warn("Attempt to access soft-deleted blob {} ({})", blobId, blobAttributes);
             return null;
           }
@@ -314,17 +320,53 @@ public class S3BlobStore
     return blob;
   }
 
-  @Nullable
-  public Blob get(final BlobId blobId, final boolean includeDeleted) {
-    // at time of writing, no soft delete, so includeDeleted can be ignored
-    return get(blobId);
-  }
-
   @Override
   @Guarded(by = STARTED)
   public boolean delete(final BlobId blobId, String reason) {
-    // FIXME: do soft deletes
-    return deleteHard(blobId);
+    checkNotNull(blobId);
+
+    final S3Blob blob = liveBlobs.getUnchecked(blobId);
+
+    Lock lock = blob.lock();
+    try {
+      log.debug("Soft deleting blob {}", blobId);
+
+      S3BlobAttributes blobAttributes = new S3BlobAttributes(s3, getConfiguredBucket(), attributePath(blobId).toString());
+
+      boolean loaded = blobAttributes.load();
+      if (!loaded) {
+        // This could happen under some concurrent situations (two threads try to delete the same blob)
+        // but it can also occur if the deleted index refers to a manually-deleted blob.
+        log.warn("Attempt to mark-for-delete non-existent blob {}", blobId);
+        return false;
+      }
+      else if (blobAttributes.isDeleted()) {
+        log.debug("Attempt to delete already-deleted blob {}", blobId);
+        return false;
+      }
+
+      blobAttributes.setDeleted(true);
+      blobAttributes.setDeletedReason(reason);
+      blobAttributes.store();
+
+      // set "deleted=true" tag on the object, let S3 take care of deleting the blob after it expires
+      s3.setObjectTagging(
+          new SetObjectTaggingRequest(
+              getConfiguredBucket(),
+              contentPath(blobId),
+              new ObjectTagging(Arrays.asList(DELETED_TAG))
+          )
+      );
+      blob.markStale();
+
+      return true;
+    }
+    catch (Exception e) {
+      throw new BlobStoreException(e, blobId);
+    }
+    finally {
+      lock.unlock();
+    }
   }
 
   @Override
@@ -370,7 +412,6 @@ public class S3BlobStore
     }
   }
 
-
   @Override
   @Guarded(by = STARTED)
   public BlobStoreMetrics getMetrics() {
@@ -401,12 +442,59 @@ public class S3BlobStore
       this.s3 = amazonS3Factory.create(configuration);
       if (!s3.doesBucketExist(getConfiguredBucket())) {
         s3.createBucket(getConfiguredBucket());
+
+        addBucketLifecycleConfiguration(null);
+      } else {
+        // bucket exists, we should test that the correct lifecycle config is present
+        BucketLifecycleConfiguration lifecycleConfiguration = s3.getBucketLifecycleConfiguration(getConfiguredBucket());
+        if (!isExpirationLifecycleConfigurationPresent(lifecycleConfiguration)) {
+          addBucketLifecycleConfiguration(lifecycleConfiguration);
+        }
       }
+
       setConfiguredBucket(getConfiguredBucket());
     }
     catch (Exception e) {
       throw new BlobStoreException("Unable to initialize blob store bucket: " + getConfiguredBucket(), e, null);
     }
+  }
+
+  boolean isExpirationLifecycleConfigurationPresent(BucketLifecycleConfiguration lifecycleConfiguration) {
+    return lifecycleConfiguration != null &&
+        lifecycleConfiguration.getRules() != null &&
+        lifecycleConfiguration.getRules().stream()
+        .filter(r -> r.getExpirationInDays() == getConfiguredExpirationInDays())
+        .filter(r -> {
+          LifecycleFilterPredicate predicate = r.getFilter().getPredicate();
+          if (predicate instanceof LifecycleTagPredicate) {
+            LifecycleTagPredicate tagPredicate = (LifecycleTagPredicate) predicate;
+            return DELETED_TAG.equals(tagPredicate.getTag());
+          }
+          return false;
+        })
+        .findAny().isPresent();
+  }
+
+  BucketLifecycleConfiguration makeLifecycleConfiguration(BucketLifecycleConfiguration existing, int expirationInDays) {
+    BucketLifecycleConfiguration.Rule rule = new BucketLifecycleConfiguration.Rule()
+        .withId(LIFECYCLE_EXPIRATION_RULE_ID)
+        .withFilter(new LifecycleFilter(
+            new LifecycleTagPredicate(DELETED_TAG)))
+        .withExpirationInDays(expirationInDays)
+        .withStatus(BucketLifecycleConfiguration.ENABLED.toString());
+
+    if (existing != null) {
+      existing.getRules().add(rule);
+      return existing;
+    } else {
+      return new BucketLifecycleConfiguration().withRules(rule);
+    }
+  }
+
+  private void addBucketLifecycleConfiguration(BucketLifecycleConfiguration lifecycleConfiguration) {
+    s3.setBucketLifecycleConfiguration(
+        getConfiguredBucket(),
+        makeLifecycleConfiguration(lifecycleConfiguration, getConfiguredExpirationInDays()));
   }
 
   private boolean delete(final String path) throws IOException {
@@ -419,17 +507,18 @@ public class S3BlobStore
     s3.deleteObject(getConfiguredBucket(), path);
   }
 
-  private void move(final String source, final String target) throws IOException {
-    s3.copyObject(getConfiguredBucket(), source, getConfiguredBucket(), target);
-    s3.deleteObject(getConfiguredBucket(), source);
-  }
-
   private void setConfiguredBucket(final String bucket) {
     blobStoreConfiguration.attributes(CONFIG_KEY).set(BUCKET_KEY, bucket);
   }
 
   private String getConfiguredBucket() {
     return blobStoreConfiguration.attributes(CONFIG_KEY).require(BUCKET_KEY).toString();
+  }
+
+  private int getConfiguredExpirationInDays() {
+    return Integer.parseInt(
+        blobStoreConfiguration.attributes(CONFIG_KEY).get(EXPIRATION_KEY, DEFAULT_EXPIRATION_IN_DAYS).toString()
+    );
   }
 
   /**
