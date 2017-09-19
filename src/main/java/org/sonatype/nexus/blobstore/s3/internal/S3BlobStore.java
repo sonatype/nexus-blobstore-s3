@@ -349,14 +349,11 @@ public class S3BlobStore
       blobAttributes.setDeletedReason(reason);
       blobAttributes.store();
 
-      // set "deleted=true" tag on the object, let S3 take care of deleting the blob after it expires
-      s3.setObjectTagging(
-          new SetObjectTaggingRequest(
-              getConfiguredBucket(),
-              contentPath(blobId),
-              new ObjectTagging(Arrays.asList(DELETED_TAG))
-          )
-      );
+      // soft delete is implemented using an S3 lifecycle that sets expiration on objects with DELETED_TAG
+      // tag the bytes
+      s3.setObjectTagging(withDeletedTag(contentPath(blobId)));
+      // tag the attributes
+      s3.setObjectTagging(withDeletedTag(attributePath(blobId)));
       blob.markStale();
 
       return true;
@@ -367,6 +364,14 @@ public class S3BlobStore
     finally {
       lock.unlock();
     }
+  }
+
+  SetObjectTaggingRequest withDeletedTag(final String key) {
+    return new SetObjectTaggingRequest(
+        getConfiguredBucket(),
+        key,
+        new ObjectTagging(Arrays.asList(DELETED_TAG))
+    );
   }
 
   @Override
