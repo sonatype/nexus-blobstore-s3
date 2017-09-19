@@ -21,10 +21,12 @@ import com.amazonaws.services.s3.model.BucketLifecycleConfiguration
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration.Transition
 import com.amazonaws.services.s3.model.S3Object
 import com.amazonaws.services.s3.model.S3ObjectInputStream
+import com.amazonaws.services.s3.model.SetObjectTaggingRequest
 import com.amazonaws.services.s3.model.StorageClass
-import com.amazonaws.services.s3.model.lifecycle.LifecycleFilter
-import com.amazonaws.services.s3.model.lifecycle.LifecycleTagPredicate
 import spock.lang.Specification
+
+import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.BLOB_ATTRIBUTE_SUFFIX
+import static org.sonatype.nexus.blobstore.s3.internal.S3BlobStore.BLOB_CONTENT_SUFFIX
 
 /**
  * {@link S3BlobStore} tests.
@@ -109,7 +111,12 @@ class S3BlobStoreTest
 
     then: 'deleted tag is added'
       deleted == true
-      1 * s3.setObjectTagging(!null)
+      1 * s3.setObjectTagging(_) >> { args ->
+        assert args[0].getKey().endsWith(BLOB_CONTENT_SUFFIX) == true
+      }
+      1 * s3.setObjectTagging(_) >> { args ->
+        assert args[0].getKey().endsWith(BLOB_ATTRIBUTE_SUFFIX) == true
+      }
   }
 
   def 'soft delete returns false when blob does not exist'() {
