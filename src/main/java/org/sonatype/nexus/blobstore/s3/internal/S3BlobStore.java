@@ -77,9 +77,9 @@ public class S3BlobStore
 
   public static final String BLOB_ATTRIBUTE_SUFFIX = ".properties";
 
-  public static final String CONFIG_KEY = "s3";
+  public static final String CONFIG_KEY = "file";
 
-  public static final String BUCKET_KEY = "bucket";
+  public static final String BUCKET_KEY = "path";
 
   public static final String ACCESS_KEY_ID_KEY = "accessKeyId";
 

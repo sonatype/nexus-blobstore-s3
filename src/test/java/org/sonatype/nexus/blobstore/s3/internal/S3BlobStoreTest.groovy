@@ -49,7 +49,7 @@ public class S3BlobStoreTest
       permanentLocationStrategy.location(_) >> { args -> args[0].toString() }
       amazonS3Factory.create(_) >> s3
       def config = new BlobStoreConfiguration()
-      config.attributes = [s3: [bucket: 'mybucket']]
+      config.attributes = [file: [path: 'mybucket']]
       def attributesS3Object = mockS3Object("""\
         |#Thu Jun 01 23:10:55 UTC 2017
         |@BlobStore.created-by=admin
