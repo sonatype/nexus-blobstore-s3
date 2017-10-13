@@ -12,6 +12,7 @@
  */
 package org.sonatype.nexus.blobstore.s3.internal;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -59,6 +60,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.transfer.TransferManager;
+import org.apache.commons.io.IOUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -200,9 +202,13 @@ public class S3BlobStore
 
     return create(headers, destination -> {
         try (InputStream data = blobData) {
-          MetricsInputStream input = new MetricsInputStream(data);
+          byte[] bytes = IOUtils.toByteArray(data);
+          ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+          MetricsInputStream input = new MetricsInputStream(byteArrayInputStream);
+          ObjectMetadata meta = new ObjectMetadata();
+          meta.setContentLength(bytes.length);
           TransferManager transferManager = new TransferManager(s3);
-          transferManager.upload(getConfiguredBucket(), destination, input, new ObjectMetadata())
+          transferManager.upload(getConfiguredBucket(), destination, input, meta)
               .waitForCompletion();
           return input.getMetrics();
         } catch (InterruptedException e) {
