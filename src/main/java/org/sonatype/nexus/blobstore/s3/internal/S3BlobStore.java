@@ -42,6 +42,7 @@ import org.sonatype.nexus.blobstore.api.BlobStoreUsageChecker;
 import org.sonatype.nexus.common.stateguard.Guarded;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
 
+import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.BucketLifecycleConfiguration;
 import com.amazonaws.services.s3.model.ObjectTagging;
 import com.amazonaws.services.s3.model.SetObjectTaggingRequest;
@@ -537,6 +538,14 @@ public class S3BlobStore
       }
       else {
         log.warn("Unable to delete non-empty blob store content directory in bucket {}", getConfiguredBucket());
+      }
+    }
+    catch (AmazonS3Exception s3Exception) {
+      if ("BucketNotEmpty".equals(s3Exception.getErrorCode())) {
+        log.warn("Unable to delete non-empty blob store bucket {}", getConfiguredBucket());
+      }
+      else {
+        throw s3Exception;
       }
     }
     catch (IOException e) {
