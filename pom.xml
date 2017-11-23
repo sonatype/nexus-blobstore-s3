@@ -20,13 +20,13 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.6.0-02</version>
+    <version>3.6.1-02</version>
   </parent>
 
   <artifactId>nexus-blobstore-s3</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
   <inceptionYear>2017</inceptionYear>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>1.2.1-SNAPSHOT</version>
   <packaging>bundle</packaging>
 
   <dependencies>
