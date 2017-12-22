@@ -87,7 +87,7 @@ public class S3BlobStoreDescriptor
     @DefaultMessage("Expiration Days")
     String expirationLabel();
 
-    @DefaultMessage("How many days until deleted blobs are finally removed from the S3 bucket")
+    @DefaultMessage("How many days until deleted blobs are finally removed from the S3 bucket. Set -1 to disable (Minio)")
     String expirationHelp();
   }
 
@@ -151,7 +151,7 @@ public class S3BlobStoreDescriptor
         messages.expirationHelp(),
         FormField.OPTIONAL)
         .withInitialValue(S3BlobStore.DEFAULT_EXPIRATION_IN_DAYS)
-        .withMinimumValue(1);
+        .withMinimumValue(-1);
   }
 
   @Override
