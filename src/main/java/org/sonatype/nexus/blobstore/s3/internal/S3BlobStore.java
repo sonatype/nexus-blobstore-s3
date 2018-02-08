@@ -26,8 +26,8 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 
+import org.sonatype.nexus.blobstore.BlobIdLocationResolver;
 import org.sonatype.nexus.blobstore.BlobSupport;
-import org.sonatype.nexus.blobstore.LocationStrategy;
 import org.sonatype.nexus.blobstore.MetricsInputStream;
 import org.sonatype.nexus.blobstore.StreamMetrics;
 import org.sonatype.nexus.blobstore.api.Blob;
@@ -122,9 +122,7 @@ public class S3BlobStore
 
   private final AmazonS3Factory amazonS3Factory;
 
-  private final LocationStrategy permanentLocationStrategy;
-
-  private final LocationStrategy temporaryLocationStrategy;
+  private final BlobIdLocationResolver blobIdLocationResolver;
 
   private BlobStoreConfiguration blobStoreConfiguration;
 
@@ -136,13 +134,11 @@ public class S3BlobStore
 
   @Inject
   public S3BlobStore(final AmazonS3Factory amazonS3Factory,
-                     @Named("volume-chapter") final LocationStrategy permanentLocationStrategy,
-                     @Named("temporary") final LocationStrategy temporaryLocationStrategy,
+                     final BlobIdLocationResolver blobIdLocationResolver,
                      final S3BlobStoreMetricsStore storeMetrics)
   {
     this.amazonS3Factory = checkNotNull(amazonS3Factory);
-    this.permanentLocationStrategy = checkNotNull(permanentLocationStrategy);
-    this.temporaryLocationStrategy = checkNotNull(temporaryLocationStrategy);
+    this.blobIdLocationResolver = checkNotNull(blobIdLocationResolver);
     this.storeMetrics = checkNotNull(storeMetrics);
   }
 
@@ -190,10 +186,7 @@ public class S3BlobStore
    * Returns the location for a blob ID based on whether or not the blob ID is for a temporary or permanent blob.
    */
   private String getLocation(final BlobId id) {
-    if (id.asUniqueString().startsWith(TEMPORARY_BLOB_ID_PREFIX)) {
-      return CONTENT_PREFIX + "/" + temporaryLocationStrategy.location(id);
-    }
-    return CONTENT_PREFIX + "/" + permanentLocationStrategy.location(id);
+    return CONTENT_PREFIX + "/" + blobIdLocationResolver.getLocation(id);
   }
 
   @Override
@@ -226,14 +219,7 @@ public class S3BlobStore
     checkArgument(headers.containsKey(BLOB_NAME_HEADER), "Missing header: %s", BLOB_NAME_HEADER);
     checkArgument(headers.containsKey(CREATED_BY_HEADER), "Missing header: %s", CREATED_BY_HEADER);
 
-    // Generate a new blobId
-    BlobId blobId;
-    if (headers.containsKey(TEMPORARY_BLOB_HEADER)) {
-      blobId = new BlobId(TEMPORARY_BLOB_ID_PREFIX + UUID.randomUUID().toString());
-    }
-    else {
-      blobId = new BlobId(UUID.randomUUID().toString());
-    }
+    final BlobId blobId = blobIdLocationResolver.fromHeaders(headers);
 
     final String blobPath = contentPath(blobId);
     final String attributePath = attributePath(blobId);
