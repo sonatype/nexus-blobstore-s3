@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 export S3_BLOBSTORE_VERSION=1.2.1-SNAPSHOT
-export NEXUS_HOME=../nexus-professional-3.6.1-02
+export NEXUS_HOME=../nexus-professional-3.8.0-02
 # export NEXUS_HOME=../nexus-internal/target/nexus-professional-3.7.0-SNAPSHOT
 
 mkdir -p ${NEXUS_HOME}/system/org/sonatype/nexus/nexus-blobstore-s3/${S3_BLOBSTORE_VERSION}/
