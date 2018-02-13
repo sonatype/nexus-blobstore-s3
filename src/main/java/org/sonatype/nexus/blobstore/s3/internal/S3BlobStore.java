@@ -432,12 +432,16 @@ public class S3BlobStore
       if (!s3.doesBucketExist(getConfiguredBucket())) {
         s3.createBucket(getConfiguredBucket());
 
-        addBucketLifecycleConfiguration(null);
+        if (getConfiguredExpirationInDays()>=0) {
+          addBucketLifecycleConfiguration(null);
+        }
       } else {
-        // bucket exists, we should test that the correct lifecycle config is present
-        BucketLifecycleConfiguration lifecycleConfiguration = s3.getBucketLifecycleConfiguration(getConfiguredBucket());
-        if (!isExpirationLifecycleConfigurationPresent(lifecycleConfiguration)) {
-          addBucketLifecycleConfiguration(lifecycleConfiguration);
+        if (getConfiguredExpirationInDays()>=0) {
+          // bucket exists, we should test that the correct lifecycle config is present
+          BucketLifecycleConfiguration lifecycleConfiguration = s3.getBucketLifecycleConfiguration(getConfiguredBucket());
+          if (!isExpirationLifecycleConfigurationPresent(lifecycleConfiguration)) {
+            addBucketLifecycleConfiguration(lifecycleConfiguration);
+          }
         }
       }
 
