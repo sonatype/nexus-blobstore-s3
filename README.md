@@ -70,8 +70,8 @@ Log in as admin and create a new blobstore, selecting S3 as the type.
 If any fields are left blank, AWS credentials in `~/.aws/credentials`
 will be used.
 
-Building the Docker image
--------------------------
+Building Nexus Docker image with this bundle
+--------------------------------------------
 ```
 docker build --rm=true -t nexus-with-s3-blobstore:1.2.1-SNAPSHOT .
 ```
