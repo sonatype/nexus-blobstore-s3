@@ -5,7 +5,7 @@ FROM maven:3-jdk-8-alpine AS build
 ARG PROJECT_NAME=nexus-blobstore-s3
 
 COPY . /${PROJECT_NAME}/
-RUN cd /${PROJECT_NAME}/; mvn package -DskipTests=true;
+RUN cd /${PROJECT_NAME}/; mvn package;
 
 ENV NEXUS_HOME /opt/sonatype/nexus
 
