@@ -120,6 +120,7 @@ Troubleshooting
 How can I remove or fix a misbehaving S3 blobstore?  You may need to
 adjust the OrientDB configuration manually to fix it.  Check out this article:
 https://support.sonatype.com/hc/en-us/articles/235816228-Relocating-Blob-Stores
+
 For S3 blobstores use 
 ```
 update repository_blobstore set attributes.s3.bucket='newbucketname' where name='mys3blobstore'
