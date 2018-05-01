@@ -52,6 +52,7 @@ import com.amazonaws.services.s3.model.lifecycle.LifecycleFilterPredicate;
 import com.amazonaws.services.s3.model.lifecycle.LifecycleTagPredicate;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.HashCode;
 import org.joda.time.DateTime;
 import com.amazonaws.services.s3.AmazonS3;
@@ -62,6 +63,7 @@ import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.amazonaws.services.s3.transfer.TransferManager;
 
 import static java.lang.String.format;
+import static java.util.stream.StreamSupport.stream;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -113,6 +115,8 @@ public class S3BlobStore
   public static final String TYPE_V1 = "s3/1";
 
   public static final String CONTENT_PREFIX = "content";
+
+  public static final String DIRECT_PATH_PREFIX = CONTENT_PREFIX + "/" + DIRECT_PATH_ROOT;
 
   public static final String TEMPORARY_BLOB_ID_PREFIX = "tmp$";
 
@@ -571,9 +575,12 @@ public class S3BlobStore
 
   @Override
   public Stream<BlobId> getDirectPathBlobIdStream(final String prefix) {
-    String subpath = format("%s/%s/%s", CONTENT_PREFIX, DIRECT_PATH_ROOT, prefix);
+    String subpath = format("%s/%s", DIRECT_PATH_PREFIX, prefix);
     Iterable<S3ObjectSummary> summaries = S3Objects.withPrefix(s3, getConfiguredBucket(), subpath);
-    return blobIdStream(summaries);
+    return stream(summaries.spliterator(), false)
+      .map(S3ObjectSummary::getKey)
+      .filter(key -> key.endsWith(BLOB_ATTRIBUTE_SUFFIX))
+      .map(this::attributePathToDirectPathBlobId);
   }
 
   private Stream<BlobId> blobIdStream(Iterable<S3ObjectSummary> summaries) {
@@ -608,5 +615,23 @@ public class S3BlobStore
       log.error("Unable to set BlobAttributes for blob id: {}, exception: {}",
           blobId, e.getMessage(), log.isDebugEnabled() ? e : null);
     }
+  }
+
+  /**
+   * Used by {@link #getDirectPathBlobIdStream(String)} to convert an s3 key to a {@link BlobId}.
+   *
+   * @see BlobIdLocationResolver
+   */
+  private BlobId attributePathToDirectPathBlobId(final String s3Key) {
+    checkArgument(s3Key.startsWith(DIRECT_PATH_PREFIX + "/"), "Not direct path blob path: %s", s3Key);
+    checkArgument(s3Key.endsWith(BLOB_ATTRIBUTE_SUFFIX), "Not blob attribute path: %s", s3Key);
+    String blobName = s3Key
+        .substring(0, s3Key.length() - BLOB_ATTRIBUTE_SUFFIX.length())
+        .substring(DIRECT_PATH_PREFIX.length() + 1);
+    Map<String, String> headers = ImmutableMap.of(
+        BLOB_NAME_HEADER, blobName,
+        DIRECT_PATH_BLOB_HEADER, "true"
+    );
+    return blobIdLocationResolver.fromHeaders(headers);
   }
 }
