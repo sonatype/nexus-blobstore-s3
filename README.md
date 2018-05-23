@@ -30,6 +30,8 @@ we would like things to flow.
 Requirements
 ------------
 
+NOTE: Nexus Repository 3.12 now bundles the S3 blobstore plugin and it's no longer necessary to build or install separately.
+
 * [Apache Maven 3.3.3+](https://maven.apache.org/install.html)
 * [Java 8+](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html)
 * Network access to https://repository.sonatype.org/content/groups/sonatype-public-grid
