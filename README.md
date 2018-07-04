@@ -12,6 +12,10 @@
     Eclipse Foundation. All other trademarks are the property of their respective owners.
 
 -->
+<aside class="warning">
+This repository is no longer maintained as the S3 implementation has been formally moved into the Repository Manager codebase as a supported feature.
+</aside>
+
 Nexus Repository S3 Blobstores
 ==============================
 
