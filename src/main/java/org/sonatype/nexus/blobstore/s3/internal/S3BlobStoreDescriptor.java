@@ -48,6 +48,12 @@ public class S3BlobStoreDescriptor
     @DefaultMessage("S3 Bucket Name")
     String bucketHelp();
 
+    @DefaultMessage("Prefix")
+    String prefixLabel();
+
+    @DefaultMessage("S3 Path prefix")
+    String prefixHelp();
+
     @DefaultMessage("Access Key ID")
     String accessKeyIdLabel();
 
@@ -94,6 +100,7 @@ public class S3BlobStoreDescriptor
   private static final Messages messages = I18N.create(Messages.class);
 
   private final FormField bucket;
+  private final FormField prefix;
   private final FormField accessKeyId;
   private final FormField secretAccessKey;
   private final FormField sessionToken;
@@ -108,6 +115,12 @@ public class S3BlobStoreDescriptor
         messages.bucketLabel(),
         messages.bucketHelp(),
         FormField.MANDATORY
+    );
+    this.prefix = new StringTextFormField(
+        S3BlobStore.BUCKET_PREFIX,
+        messages.prefixLabel(),
+        messages.prefixHelp(),
+        FormField.OPTIONAL
     );
     this.accessKeyId = new StringTextFormField(
         S3BlobStore.ACCESS_KEY_ID_KEY,
@@ -161,6 +174,6 @@ public class S3BlobStoreDescriptor
 
   @Override
   public List<FormField> getFormFields() {
-      return Arrays.asList(bucket, accessKeyId, secretAccessKey, sessionToken, assumeRole, region, endpoint, expiration);
+      return Arrays.asList(bucket, prefix, accessKeyId, secretAccessKey, sessionToken, assumeRole, region, endpoint, expiration);
   }
 }

@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -92,6 +93,8 @@ public class S3BlobStore
 
   public static final String BUCKET_KEY = "bucket";
 
+  public static final String BUCKET_PREFIX = "prefix";
+
   public static final String ACCESS_KEY_ID_KEY = "accessKeyId";
 
   public static final String SECRET_ACCESS_KEY_KEY = "secretAccessKey";
@@ -149,7 +152,7 @@ public class S3BlobStore
   @Override
   protected void doStart() throws Exception {
     // ensure blobstore is supported
-    S3PropertiesFile metadata = new S3PropertiesFile(s3, getConfiguredBucket(), METADATA_FILENAME);
+    S3PropertiesFile metadata = new S3PropertiesFile(s3, getConfiguredBucket(), metadataFilePath());
     if (metadata.exists()) {
       metadata.load();
       String type = metadata.getProperty(TYPE_KEY);
@@ -162,6 +165,7 @@ public class S3BlobStore
     }
     liveBlobs = CacheBuilder.newBuilder().weakValues().build(from(S3Blob::new));
     storeMetrics.setBucket(getConfiguredBucket());
+    storeMetrics.setBucketPrefix(getBucketPrefix());
     storeMetrics.setS3(s3);
     storeMetrics.start();
   }
@@ -179,6 +183,10 @@ public class S3BlobStore
     return getLocation(id) + BLOB_CONTENT_SUFFIX;
   }
 
+  private String metadataFilePath() {
+    return getBucketPrefix() + METADATA_FILENAME;
+  }
+
   /**
    * Returns path for blob-id attribute file relative to root directory.
    */
@@ -190,7 +198,7 @@ public class S3BlobStore
    * Returns the location for a blob ID based on whether or not the blob ID is for a temporary or permanent blob.
    */
   private String getLocation(final BlobId id) {
-    return CONTENT_PREFIX + "/" + blobIdLocationResolver.getLocation(id);
+    return getBucketPrefix() + CONTENT_PREFIX + "/" + blobIdLocationResolver.getLocation(id);
   }
 
   @Override
@@ -518,6 +526,14 @@ public class S3BlobStore
     );
   }
 
+  private String getBucketPrefix() {
+    return Optional.ofNullable(blobStoreConfiguration.attributes(CONFIG_KEY).get(BUCKET_PREFIX))
+                   .map(Object::toString)
+                   .filter(s -> !s.isEmpty())
+                   .map(s -> s.replaceFirst("/$", "") + "/")
+                   .orElse("");
+  }
+
   /**
    * Delete files known to be part of the S3BlobStore implementation if the content directory is empty.
    */
@@ -527,7 +543,7 @@ public class S3BlobStore
     try {
       boolean contentEmpty = s3.listObjects(getConfiguredBucket(), CONTENT_PREFIX + "/").getObjectSummaries().isEmpty();
       if (contentEmpty) {
-        S3PropertiesFile metadata = new S3PropertiesFile(s3, getConfiguredBucket(), METADATA_FILENAME);
+        S3PropertiesFile metadata = new S3PropertiesFile(s3, getConfiguredBucket(), metadataFilePath());
         metadata.remove();
         storeMetrics.remove();
         s3.deleteBucket(getConfiguredBucket());
