@@ -88,6 +88,9 @@ permission for these actions:
 * s3:ListBucket
 * s3:GetLifecycleConfiguration
 * s3:PutLifecycleConfiguration
+* s3:DeleteObjectTagging
+* s3:GetObjectTagging
+* s3:PutObjectTagging
 
 Sample minimal policy where `<user-arn>` is the ARN of the AWS user and `<s3-bucket-name>` the S3 bucket name:
 
@@ -108,7 +111,10 @@ Sample minimal policy where `<user-arn>` is the ARN of the AWS user and `<s3-buc
                 "s3:DeleteObject",
                 "s3:ListBucket",
                 "s3:GetLifecycleConfiguration",
-                "s3:PutLifecycleConfiguration"
+                "s3:PutLifecycleConfiguration",
+                "s3:DeleteObjectTagging",
+                "s3:GetObjectTagging",
+                "s3:PutObjectTagging"
             ],
             "Resource": [
                 "arn:aws:s3:::<s3-bucket-name>",
